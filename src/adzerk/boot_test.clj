@@ -5,7 +5,7 @@
             [boot.core :as core]))
 
 (def pod-deps
-  '[[org.clojure/tools.namespace "0.2.10" :exclusions [org.clojure/clojure]]
+  '[[org.clojure/tools.namespace "0.2.11" :exclusions [org.clojure/clojure]]
     [pjstadig/humane-test-output "0.6.0"  :exclusions [org.clojure/clojure]]])
 
 (defn init [fresh-pod]
