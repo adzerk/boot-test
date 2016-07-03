@@ -135,7 +135,7 @@
    e exclusions NAMESPACE #{sym} "The set of namespace symbols to be excluded from test."
    f filters    EXPR      #{edn} "The set of expressions to use to filter namespaces."
    r requires   REQUIRES  #{sym} "Extra namespaces to pre-load into the pool of test pods for speed."
-   j junit-output-to JUNIT-OUT str "The directory where a junit formatted report will be generated for each ns"]
+   j junit-output-to JUNIT_OUT str "The directory where a junit formatted report will be generated for each ns"]
   (comp
     (run-tests :namespaces namespaces
                :exclusions exclusions
