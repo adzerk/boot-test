@@ -80,10 +80,14 @@
   [n namespaces NAMESPACE #{sym} "The set of namespace symbols to run tests in."
    e exclusions NAMESPACE #{sym} "The set of namespace symbols to be excluded from test."
    f filters    EXPR      #{edn} "The set of expressions to use to filter namespaces."
+   X exclude    REGEX     regex  "the filter for excluded namespaces"
+   I include    REGEX     regex  "the filter for included namespaces"
    r requires   REQUIRES  #{sym} "Extra namespaces to pre-load into the pool of test pods for speed."
    j junit-output-to JUNIT-OUT str "The directory where a junit formatted report will be generated for each ns"]
 
-  (let [pod-deps (update-in (core/get-env) [:dependencies] into base-pod-deps)
+  (let [exclude (or exclude #"^$")
+        include (or include #".*")
+        pod-deps (update-in (core/get-env) [:dependencies] into base-pod-deps)
         worker-pods (pod/pod-pool pod-deps :init (partial init requires))]
     (core/cleanup (worker-pods :shutdown))
     (core/with-pre-wrap fileset
@@ -93,7 +97,9 @@
                              (all-ns* ~@(->> fileset
                                              core/input-dirs
                                              (map (memfn getPath))))))
-            namespaces (remove (or exclusions #{}) namespaces)]
+            namespaces (remove (or exclusions #{}) namespaces)
+            namespaces (filter #(and (re-find include (name %))
+                                     (not (re-find exclude (name %)))) namespaces)]
         (if (seq namespaces)
           (let [filterf `(~'fn [~'%] (and ~@filters))
                 tmp (core/tmp-dir!)
@@ -134,12 +140,16 @@
   [n namespaces NAMESPACE #{sym} "The set of namespace symbols to run tests in."
    e exclusions NAMESPACE #{sym} "The set of namespace symbols to be excluded from test."
    f filters    EXPR      #{edn} "The set of expressions to use to filter namespaces."
+   X exclude    REGEX     regex  "the filter for excluded namespaces"
+   I include    REGEX     regex  "the filter for included namespaces"
    r requires   REQUIRES  #{sym} "Extra namespaces to pre-load into the pool of test pods for speed."
    j junit-output-to JUNITOUT str "The directory where a junit formatted report will be generated for each ns"]
   (comp
     (run-tests :namespaces namespaces
                :exclusions exclusions
                :filters filters
+               :exclude exclude
+               :include include
                :requires requires
                :junit-output-to junit-output-to)
     (if junit-output-to
