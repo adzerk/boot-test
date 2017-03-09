@@ -20,6 +20,9 @@
               '[clojure.tools.namespace.find :refer [find-namespaces-in-dir]])
      (activate!)
 
+     ;; flush report output as it happens
+      (alter-var-root #'t/do-report (fn [fun] (fn [& args] (let [result (apply fun args)] (flush) result))))                                                                                                                                         
+
      (defn all-ns* [& dirs]
        (distinct (mapcat #(find-namespaces-in-dir (io/file %)) dirs)))
 
