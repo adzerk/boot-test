@@ -181,5 +181,6 @@
       fileset
       (let [summary (:clojure.test/result (meta fileset))]
         (if (> (apply + (map summary [:fail :error])) 0)
-          (throw (ex-info "Some tests failed or errored" summary))
+          (throw (ex-info "Some tests failed or errored"
+                          (assoc summary :boot.util/omit-stacktrace? true)))
           fileset)))))
