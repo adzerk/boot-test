@@ -9,55 +9,64 @@
   '[[org.clojure/tools.namespace "0.2.11" :exclusions [org.clojure/clojure]]
     [pjstadig/humane-test-output "0.6.0"  :exclusions [org.clojure/clojure]]])
 
+(def last-pod-id (atom (System/currentTimeMillis)))
+
 (defn init [requires fresh-pod]
   (dorun (map (partial pod/require-in fresh-pod) requires))
-  (doto fresh-pod
-    (pod/with-eval-in
-     (require '[clojure.test :as t]
-              '[clojure.java.io :as io]
-              '[clojure.test.junit :as junit]
-              '[pjstadig.humane-test-output :refer [activate!]]
-              '[clojure.tools.namespace.find :refer [find-namespaces-in-dir]])
-     (activate!)
+  (let [pod-id (swap! last-pod-id inc)]
+    (doto fresh-pod
+      (pod/with-eval-in
+        (require '[clojure.test :as t]
+                 '[clojure.java.io :as io]
+                 '[clojure.test.junit :as junit]
+                 '[boot.pod :as pod]
+                 '[pjstadig.humane-test-output :refer [activate!]]
+                 '[clojure.tools.namespace.find :refer [find-namespaces-in-dir]])
+        (import '[java.util.concurrent ConcurrentLinkedQueue])
+        (when-not pod/pod-id
+          (pod/set-pod-id! ~pod-id))
+        (when-not @pod/shutdown-hooks
+          (reset! pod/shutdown-hooks (ConcurrentLinkedQueue.)))
+        (activate!)
 
-     (defn all-ns* [& dirs]
-       (distinct (mapcat #(find-namespaces-in-dir (io/file %)) dirs)))
+        (defn all-ns* [& dirs]
+          (distinct (mapcat #(find-namespaces-in-dir (io/file %)) dirs)))
 
-     (defn junit-plus-default-report [old-report junit-out m]
-       (old-report m)
-       (binding [t/*test-out* junit-out
-                 ;; junit will inc the counters, but old-report is already doing that
-                 ;; so we pass a new counters ref that will be discarded to avoid
-                 ;; duplicate counters
-                 t/*report-counters* (ref {})]
-         (junit/junit-report m)))
+        (defn junit-plus-default-report [old-report junit-out m]
+          (old-report m)
+          (binding [t/*test-out* junit-out
+                    ;; junit will inc the counters, but old-report is already doing that
+                    ;; so we pass a new counters ref that will be discarded to avoid
+                    ;; duplicate counters
+                    t/*report-counters* (ref {})]
+            (junit/junit-report m)))
 
-     (defn run-tests-with-junit-reporter [run-tests-fn output-to]
-       (let [junit-out-filename output-to
-             old-report t/report]
-         (with-open [junit-out (io/writer junit-out-filename)]
-           (binding [junit/*var-context* (list)
-                     junit/*depth* 1
-                     t/report (partial junit-plus-default-report old-report junit-out)]
-             (binding [*out* junit-out]
-               (println "<?xml version=\"1.0\" encoding=\"UTF-8\"?>")
-               (println "<testsuites>"))
-             (let [result  (run-tests-fn)]
-               (binding [*out* junit-out]
-                 (println "</testsuites>"))
-               result)))))
+        (defn run-tests-with-junit-reporter [run-tests-fn output-to]
+          (let [junit-out-filename output-to
+                old-report t/report]
+            (with-open [junit-out (io/writer junit-out-filename)]
+              (binding [junit/*var-context* (list)
+                        junit/*depth* 1
+                        t/report (partial junit-plus-default-report old-report junit-out)]
+                (binding [*out* junit-out]
+                  (println "<?xml version=\"1.0\" encoding=\"UTF-8\"?>")
+                  (println "<testsuites>"))
+                (let [result  (run-tests-fn)]
+                  (binding [*out* junit-out]
+                    (println "</testsuites>"))
+                  result)))))
 
-     (defn test-ns* [pred junit-output-to ns]
-       (binding [t/*report-counters* (ref t/*initial-report-counters*)]
-         (let [ns-obj (the-ns ns)
-               run-tests* (fn []
-                            (t/do-report {:type :begin-test-ns :ns ns-obj})
-                            (t/test-vars (filter pred (vals (ns-publics ns))))
-                            (t/do-report {:type :end-test-ns :ns ns-obj})
-                            @t/*report-counters*)]
-           (if junit-output-to
-             (run-tests-with-junit-reporter run-tests* (io/file junit-output-to (str (name ns) ".xml")))
-             (run-tests*))))))))
+        (defn test-ns* [pred junit-output-to ns]
+          (binding [t/*report-counters* (ref t/*initial-report-counters*)]
+            (let [ns-obj (the-ns ns)
+                  run-tests* (fn []
+                               (t/do-report {:type :begin-test-ns :ns ns-obj})
+                               (t/test-vars (filter pred (vals (ns-publics ns))))
+                               (t/do-report {:type :end-test-ns :ns ns-obj})
+                               @t/*report-counters*)]
+              (if junit-output-to
+                (run-tests-with-junit-reporter run-tests* (io/file junit-output-to (str (name ns) ".xml")))
+                (run-tests*)))))))))
 
 ;;; This prevents a name collision WARNING between the test task and
 ;;; clojure.core/test, a function that nobody really uses or cares
