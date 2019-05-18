@@ -86,7 +86,7 @@
   [c clojure    VERSION   str    "the version of Clojure for testing."
    n namespaces NAMESPACE #{sym} "The set of namespace symbols to run tests in."
    e exclusions NAMESPACE #{sym} "The set of namespace symbols to be excluded from test."
-   f filters    EXPR      #{edn} "The set of expressions to use to filter namespaces."
+   f filters    EXPR      #{edn} "The set of expressions to use to filter vars within namespaces."
    X exclude    REGEX     regex  "the filter for excluded namespaces"
    I include    REGEX     regex  "the filter for included namespaces"
    r requires   REQUIRES  #{sym} "Extra namespaces to pre-load into the pool of test pods for speed."
